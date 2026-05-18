@@ -57,3 +57,25 @@ recording:
 qxg_export:
   enabled: false
   output_dir: "qxg_exports"
+
+qualinet:
+  enabled: false
+  mode: "model"
+  auto_download: true
+  allow_geometry_fallback: true
+  ra_model_path: "models/qualinet/ra_model.pth"
+  qdc_model_path: "models/qualinet/qdc_model.pth"
+  ra_model_url: ""
+  qdc_model_url: ""
+  ra_labels:
+    - "left_above"
+    - "left_overlap"
+    - "left_below"
+    - "overlap_above"
+    - "overlap_overlap"
+    - "overlap_below"
+    - "right_above"
+    - "right_overlap"
+    - "right_below"
+  qdc_labels: ["very close", "close", "normal", "far"]
+  image_size: 224

@@ -13,6 +13,7 @@ The platform is designed for connected, cooperative, and automated mobility scen
 - Relevance filtering for selecting the most important detected objects.
 - Real-time recording of color frames, and depth frames when 3D depth is available.
 - QXG graph export to JSON for later analysis.
+- Optional QualiNet RA/QDC relation construction from image crops.
 - GUI object-selection panel for choosing which classes to detect.
 - Local CLI mode and server/client mode for remote processing workflows.
 
@@ -171,6 +172,7 @@ The launcher lets you configure:
 - Relevance filtering.
 - Real-time recording output.
 - QXG graph export output.
+- QualiNet RA/QDC relation-constructor configuration.
 - Object classes to detect through checkboxes.
 
 Press **Start Platform** to open the visualization dashboard. Press `q` inside the OpenCV dashboard to stop the run.
@@ -279,6 +281,53 @@ qxg_export:
   output_dir: "qxg_exports"
 ```
 
+## QualiNet RA/QDC Constructor
+
+The GUI includes a **QualiNet RA/QDC** tab. This optional constructor integrates the companion [QualiNet](https://github.com/nassimbel/QualiNet) approach into QXG Platform as an RA/QDC-only relation builder.
+
+When enabled, QualiNet builds camera-to-object qualitative relations from the current image and detected object bounding boxes:
+
+- `RA`: qualitative rectangle-position relation.
+- `QDC`: qualitative distance class.
+
+The tab has its own configuration:
+
+- Enable or disable the QualiNet constructor.
+- Local RA model path.
+- Local QDC model path.
+- RA model download URL.
+- QDC model download URL.
+- Automatic model download toggle.
+- Geometry fallback toggle for runs where trained model files are not available yet.
+
+If automatic download is enabled and a configured model path is missing, QXG downloads the corresponding model URL before the run starts. The trained model files are not stored in this repository; place them under `models/qualinet/` or provide downloadable URLs in the GUI/config.
+
+YAML configuration:
+
+```yaml
+qualinet:
+  enabled: true
+  mode: "model"
+  auto_download: true
+  allow_geometry_fallback: true
+  ra_model_path: "models/qualinet/ra_model.pth"
+  qdc_model_path: "models/qualinet/qdc_model.pth"
+  ra_model_url: ""
+  qdc_model_url: ""
+  ra_labels:
+    - "left_above"
+    - "left_overlap"
+    - "left_below"
+    - "overlap_above"
+    - "overlap_overlap"
+    - "overlap_below"
+    - "right_above"
+    - "right_overlap"
+    - "right_below"
+  qdc_labels: ["very close", "close", "normal", "far"]
+  image_size: 224
+```
+
 ## Object Selection
 
 The GUI object panel controls `detection.classes`. Only checked object classes are kept after detection. This is useful for AI4CCAM experiments that focus on specific road users such as pedestrians, cars, buses, trucks, bicycles, and motorcycles.
@@ -316,6 +365,7 @@ Important sections:
 - `visualization`: dashboard options.
 - `recording`: realtime recording options.
 - `qxg_export`: QXG graph JSON export options.
+- `qualinet`: optional RA/QDC-only QualiNet relation constructor.
 
 ## References
 

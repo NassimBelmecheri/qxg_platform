@@ -213,7 +213,7 @@ class Visualizer:
             return
         for (left, right), relation in list(relations.items())[-9:]:
             ra = relation.get("RA", "-")
-            distance = relation.get("distance", "-")
+            distance = relation.get("QDC", relation.get("distance", "-"))
             qtc_x = relation.get("QTC_x", "-")
             text = f"{left}-{right}: RA={ra}, D={distance}, Q={qtc_x}"
             self._label(panel, text[:46], 28, y, self.colors["muted"], 0.48)

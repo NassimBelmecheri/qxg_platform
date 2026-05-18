@@ -6,20 +6,27 @@ from typing import Any
 import numpy as np
 
 from qxg_platform.domain import TrackedObject
+from qxg_platform.qualinet import QualiNetRelationConstructor
 from qxg_platform.qxg_core import build_spatiotemporal_graph
 
 
 class QXGBuilder:
-    def __init__(self, analysis_config: dict[str, Any], camera_object: TrackedObject | None = None):
+    def __init__(
+        self,
+        analysis_config: dict[str, Any],
+        camera_object: TrackedObject | None = None,
+        qualinet_constructor: QualiNetRelationConstructor | None = None,
+    ):
         self.config = analysis_config
         self.camera_object = camera_object
+        self.qualinet_constructor = qualinet_constructor
         self.reasoning_mode = str(analysis_config.get("reasoning_mode", "3d"))
         self.relations_graph: dict[tuple[int, int], list[tuple[int, dict[str, Any]]]] = {}
         self.object_attributes_history: dict[str, list[tuple[int, dict[str, Any]]]] = {}
         self.current_frame_relations: dict[tuple[str, str], dict[str, Any]] = {}
 
     def build(
-        self, tracked_objects: list[TrackedObject], frame_idx: int
+        self, tracked_objects: list[TrackedObject], frame_idx: int, frame: np.ndarray | None = None
     ) -> tuple[dict, list[TrackedObject]]:
         valid_objects = self._valid_objects(tracked_objects)
         if self.camera_object is not None:
@@ -56,6 +63,8 @@ class QXGBuilder:
             distance_thresholds=self.config.get("distance_thresholds", {}),
             **kwargs,
         )
+        if self.qualinet_constructor is not None and frame is not None:
+            relations.update(self.qualinet_constructor.build(frame, valid_objects))
 
         object_map = {obj.tracking_id: obj for obj in valid_objects}
         for pair, pair_relations in relations.items():
