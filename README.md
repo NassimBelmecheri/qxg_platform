@@ -149,7 +149,7 @@ configs/realtime.yaml
 Update `model_weights` so each profile points to a local YOLO weights file, for example:
 
 ```yaml
-model_weights: "D:/nassim/qxg_platform/models/yolo11x.pt"
+model_weights: "D:/qxg_platform/models/yolo11x.pt"
 ```
 
 Model weights are intentionally not stored in this repository.
