@@ -15,7 +15,7 @@ realsense:
 
 detection:
   enabled: true
-  model_weights: "D:/nassim/qxg_artifacts/models/yolo11x.pt"
+  model_weights: "D:/nassim/qxg_platform/models/yolo11x.pt"
   classes: ["person", "car", "bus", "motorcycle", "truck", "bicycle"]
   confidence_threshold: 0.6
   image_size: 1280

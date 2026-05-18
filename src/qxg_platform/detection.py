@@ -21,6 +21,7 @@ class DetectionTracker:
         self.enabled = bool(detection_config.get("enabled", True))
         self.model = None
         self.classes: dict[int, str] = {}
+        self._last_empty_log_frame = 0
         if self.enabled:
             self._load_model()
 
@@ -62,16 +63,20 @@ class DetectionTracker:
 
         active: list[TrackedObject] = []
         boxes = results[0].boxes if results else None
-        if boxes is None or boxes.id is None:
+        if boxes is None or len(boxes) == 0:
+            self._log_empty_result("no boxes returned")
             return active
 
         allowed_classes = set(self.config.get("classes", []))
         box_data = boxes.cpu().numpy()
-        for index in range(len(box_data.id)):
-            tracking_id = int(box_data.id[index])
+        raw_count = len(box_data)
+        kept_count = 0
+        for index in range(raw_count):
+            tracking_id = self._tracking_id_for_box(box_data, index)
             category = self.classes[int(box_data.cls[index])]
             if allowed_classes and category not in allowed_classes:
                 continue
+            kept_count += 1
 
             x1, y1, x2, y2 = map(int, box_data.xyxy[index])
             bbox = np.array([x1, y1, x2 - x1, y2 - y1], dtype=float)
@@ -97,6 +102,18 @@ class DetectionTracker:
             obj.update_history(time.time())
             active.append(obj)
 
+        if kept_count == 0:
+            self._log_empty_result(
+                f"{raw_count} raw detections, 0 kept after class filter {sorted(allowed_classes)}"
+            )
+        elif self.frame_count % 30 == 0:
+            LOGGER.info(
+                "Detection frame=%s raw=%s kept=%s",
+                self.frame_count,
+                raw_count,
+                kept_count,
+            )
+
         for object_id in [
             object_id
             for object_id, obj in self.objects.items()
@@ -105,6 +122,18 @@ class DetectionTracker:
             del self.objects[object_id]
 
         return active
+
+    def _tracking_id_for_box(self, box_data: Any, index: int) -> int:
+        if getattr(box_data, "id", None) is not None and box_data.id[index] is not None:
+            return int(box_data.id[index])
+        # Some Ultralytics tracker/model combinations return boxes before IDs are assigned.
+        # Use stable per-frame slots so detections are still visible and graphable.
+        return int(index + 1)
+
+    def _log_empty_result(self, reason: str) -> None:
+        if self.frame_count - self._last_empty_log_frame >= 30:
+            LOGGER.warning("No active detections at frame=%s: %s", self.frame_count, reason)
+            self._last_empty_log_frame = self.frame_count
 
     def _update_3d_state(self, obj: TrackedObject, world_info: Any) -> None:
         intrinsics = None

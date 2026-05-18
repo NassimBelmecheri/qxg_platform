@@ -211,7 +211,20 @@ class LauncherApp:
         loaded = load_config(self.config_path.get())
         raw = copy.deepcopy(loaded.raw)
         profile = self.profiles[self.profile_key.get()]
-        raw.setdefault("runtime", {})["reasoning_mode"] = self.reasoning_mode.get()
+        reasoning_mode = self.reasoning_mode.get()
+        if reasoning_mode == "3d" and self.input_type.get() not in {"realsense", "recording"}:
+            LOGGER.warning(
+                "3D requested for input_type=%s; falling back to 2D because no depth source exists",
+                self.input_type.get(),
+            )
+            reasoning_mode = "2d"
+            self.reasoning_mode.set("2d")
+            messagebox.showwarning(
+                "3D needs depth",
+                "3D reasoning needs RealSense or a recorded folder with depth frames. "
+                "For video files and normal cameras, QXG will run in 2D.",
+            )
+        raw.setdefault("runtime", {})["reasoning_mode"] = reasoning_mode
         raw.setdefault("detection", {})["model_weights"] = self.model_path.get()
         raw["detection"]["confidence_threshold"] = float(
             profile.get("confidence_threshold", raw["detection"].get("confidence_threshold", 0.5))

@@ -2,8 +2,8 @@ profiles:
   balanced_video:
     label: "Balanced video"
     input_types: ["video", "recording"]
-    model_weights: "D:/nassim/qxg_artifacts/models/yolo11x.pt"
-    confidence_threshold: 0.6
+    model_weights: "D:/nassim/qxg_platform/models/yolo11x.pt"
+    confidence_threshold: 0.35
     image_size: 1280
     reasoning_mode: "2d"
     classes: ["person", "car", "bus", "motorcycle", "truck", "bicycle"]
@@ -11,8 +11,8 @@ profiles:
   realtime_fast:
     label: "Realtime fast"
     input_types: ["camera", "realsense"]
-    model_weights: "D:/nassim/qxg_artifacts/models/yolo11n.pt"
-    confidence_threshold: 0.45
+    model_weights: "D:/nassim/qxg_platform/models/yolo12n.pt"
+    confidence_threshold: 0.25
     image_size: 960
     reasoning_mode: "2d"
     classes: ["person", "car", "bus", "motorcycle", "truck", "bicycle"]
@@ -20,8 +20,8 @@ profiles:
   realsense_depth:
     label: "RealSense depth"
     input_types: ["realsense"]
-    model_weights: "D:/nassim/qxg_artifacts/models/yolo11x.pt"
-    confidence_threshold: 0.6
+    model_weights: "D:/nassim/qxg_platform/models/yolo11x.pt"
+    confidence_threshold: 0.35
     image_size: 1280
     reasoning_mode: "3d"
     classes: ["person", "car", "bus", "motorcycle", "truck", "bicycle"]
@@ -29,8 +29,8 @@ profiles:
   lightweight_demo:
     label: "Lightweight demo"
     input_types: ["video", "camera", "recording"]
-    model_weights: "D:/nassim/qxg_artifacts/models/yolov8n.pt"
-    confidence_threshold: 0.35
+    model_weights: "D:/nassim/qxg_platform/models/yolov8n.pt"
+    confidence_threshold: 0.20
     image_size: 640
     reasoning_mode: "2d"
-    classes: ["person", "car", "bus", "motorcycle", "truck", "bicycle"]
+    classes: []

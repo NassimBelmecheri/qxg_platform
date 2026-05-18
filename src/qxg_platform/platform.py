@@ -24,11 +24,14 @@ class QXGPlatform:
         self.relevance = RelevanceSelector(config.section("relevance"))
         self.visualizer = Visualizer(config.section("visualization"))
         self.camera_id = self.camera.tracking_id if self.camera else 0
+        self._depth_warning_logged = False
 
     def run(self) -> None:
         try:
             LOGGER.info("Platform processing loop started")
             for frame_idx, (frame, world_info) in enumerate(self.input_handler.frames(), start=1):
+                if self.config.reasoning_mode == "3d" and world_info is None:
+                    self._warn_missing_depth_once()
                 objects = self.detector.process_frame(frame, world_info)
                 relations, all_objects = self.builder.build(objects, frame_idx)
                 relevant = self.relevance.select(all_objects, relations, self.camera_id)
@@ -51,3 +54,12 @@ class QXGPlatform:
             self.input_handler.close()
             self.visualizer.close()
             LOGGER.info("Platform resources released")
+
+    def _warn_missing_depth_once(self) -> None:
+        if self._depth_warning_logged:
+            return
+        LOGGER.warning(
+            "3D reasoning was selected, but this input is not providing depth. "
+            "Use RealSense or a recording directory with depth frames, or select 2D."
+        )
+        self._depth_warning_logged = True
