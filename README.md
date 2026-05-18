@@ -1,94 +1,222 @@
 # QXG Platform
 
-QXG Platform turns video detections into qualitative explainable graphs. It combines object detection/tracking, optional depth input, qualitative spatial relations, relevance filtering, and an OpenCV visualization loop.
+QXG Platform is a video perception and qualitative reasoning platform developed in the context of AI4CCAM. It detects and tracks road-scene objects, estimates or consumes depth when available, builds qualitative explainable graphs, and visualizes the resulting spatial relations in real time.
 
-This repository is a production-oriented copy of the original research workspace. It intentionally excludes model weights, recordings, generated media, huge datasets, compiled binaries, and presentation files.
+The platform is designed for connected, cooperative, and automated mobility scenarios where perception output should be interpretable, inspectable, and reusable for downstream reasoning.
 
-## What Is Included
+## Core Capabilities
 
-- `src/qxg_platform/`: maintainable Python package
-- `configs/`: environment-specific YAML configs
-- `tests/`: automated tests for core graph behavior and config loading
-- `docs/`: operational notes for model artifacts and deployment
+- Object detection and tracking with YOLO models.
+- 2D qualitative spatial reasoning from video, webcam, or recordings.
+- 3D reasoning with RealSense depth, recorded depth, or monocular depth estimation.
+- Real-time OpenCV dashboard with camera view, BEV map, graph view, relation table, and object metrics.
+- Relevance filtering for selecting the most important detected objects.
+- Real-time recording of color frames, and depth frames when 3D depth is available.
+- GUI object-selection panel for choosing which classes to detect.
+- Local CLI mode and server/client mode for remote processing workflows.
 
-## What Is Not Included
+## Repository Layout
 
-Large artifacts should live outside Git, or in Git LFS/DVC:
+```text
+configs/              Runtime, model-profile, and tracker configuration
+docs/                 Operational notes for models and deployment
+models/               Local model directory, not intended for Git-tracked weights
+scripts/              Utility scripts
+src/qxg_platform/     Python package source
+tests/                Automated tests
+```
 
-- YOLO weights: `*.pt`, `*.pth`
-- sklearn/joblib models
-- RealSense recordings
-- generated videos, GIFs, PDFs, PPTX files
-- training datasets
+Large runtime artifacts such as model weights, datasets, recordings, generated videos, and RealSense captures should stay outside Git or be managed with Git LFS/DVC.
 
-## Quick Start
+## Installation
+
+Create and activate a virtual environment:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-pytest
 ```
 
-Install ML extras only on machines that run inference:
+Install machine-learning dependencies on machines that run detection or monocular depth:
 
 ```powershell
 python -m pip install -e ".[ml]"
 ```
 
-For RealSense camera support:
+Install RealSense support only on machines connected to an Intel RealSense camera:
 
 ```powershell
 python -m pip install -e ".[realsense]"
 ```
 
-## Run
+Run the test suite:
 
-Graphical launcher:
+```powershell
+pytest
+```
+
+## Model Setup
+
+Detection model paths are configured in:
+
+```text
+configs/model_profiles.yaml
+configs/video.yaml
+configs/realtime.yaml
+```
+
+Update `model_weights` so each profile points to a local YOLO weights file, for example:
+
+```yaml
+model_weights: "D:/nassim/qxg_platform/models/yolo11x.pt"
+```
+
+Model weights are intentionally not stored in this repository.
+
+## Graphical Launcher
+
+Start the launcher:
 
 ```powershell
 qxg-gui
 ```
 
-The launcher lets you choose `video`, `camera`, `realsense`, or `recording`, pick or override the model profile, and then start the visualization dashboard.
+The launcher lets you configure:
 
-Recorded/video-directory mode:
+- Input source: `video`, `camera`, `realsense`, or `recording`.
+- Source path or camera index.
+- Model profile and model weights.
+- Reasoning mode: `2d` or `3d`.
+- Relevance filtering.
+- Real-time recording output.
+- Object classes to detect through checkboxes.
 
-```powershell
-qxg --config configs/video.yaml --input recording --source D:\path\to\recording
-```
+Press **Start Platform** to open the visualization dashboard. Press `q` inside the OpenCV dashboard to stop the run.
 
-Single video file:
+## Input Modes
+
+### Single Video File
+
+Use this for normal video files such as `.mp4`, `.avi`, `.mov`, or `.mkv`.
 
 ```powershell
 qxg --config configs/video.yaml --input video --source D:\path\to\video.mp4
 ```
 
-Normal webcam:
+In 3D mode, single video files use monocular depth estimation through `depth_estimation.model_name`.
+
+### Webcam
+
+Use this for a standard live camera.
 
 ```powershell
 qxg --config configs/video.yaml --input camera --source 0
 ```
 
-When `3d` reasoning is selected with a normal camera or a single video file, QXG uses monocular depth estimation through the configured `depth_estimation.model_name`. RealSense and RealSense recordings still use sensor depth.
+`0` is the default camera index. Use `1`, `2`, and so on for additional cameras.
 
-Server mode:
+### RealSense
+
+Use this for a live Intel RealSense camera.
+
+```powershell
+qxg --config configs/realtime.yaml --input realsense
+```
+
+In 3D mode, QXG uses the RealSense depth stream aligned to the color stream.
+
+### Recording Directory
+
+Use this to replay a saved QXG recording directory.
+
+```powershell
+qxg --config configs/video.yaml --input recording --source D:\path\to\recording
+```
+
+A recording directory uses this structure:
+
+```text
+recording/
+  color/
+    000001-color.jpg
+    000002-color.jpg
+  depth/
+    000001-depth.png
+    000002-depth.png
+  config.json
+```
+
+For 2D recordings, only the `color/` directory is required. For 3D recordings, `depth/` and `config.json` provide depth maps and camera intrinsics.
+
+## Real-Time Recording
+
+The GUI includes a **Realtime Recording** panel. When enabled, QXG saves a session under:
+
+```text
+recordings/qxg_recording_YYYYMMDD_HHMMSS/
+```
+
+In `2d` mode, QXG saves:
+
+```text
+color/*.jpg
+```
+
+In `3d` mode, QXG saves color frames plus depth data when depth is available:
+
+```text
+color/*.jpg
+depth/*.png
+config.json
+```
+
+This makes live camera or RealSense runs replayable later through the `recording` input mode.
+
+## Object Selection
+
+The GUI object panel controls `detection.classes`. Only checked object classes are kept after detection. This is useful for AI4CCAM experiments that focus on specific road users such as pedestrians, cars, buses, trucks, bicycles, and motorcycles.
+
+The default class lists live in `configs/model_profiles.yaml`. You can adjust them per model profile.
+
+## Server And Client Mode
+
+Start the processing server:
 
 ```powershell
 qxg-server --config configs/realtime.yaml --host 127.0.0.1 --port 5000
 ```
 
-Client mode:
+Run a remote client:
 
 ```powershell
 qxg --mode remote --config configs/realtime.yaml --server-url http://127.0.0.1:5000
 ```
 
-## Engineering Notes
+Network payloads use JSON and base64-encoded arrays.
 
-- Network payloads use JSON plus base64 arrays, not pickle.
-- Model files are configured by path and validated at startup.
-- GUI model profiles live in `configs/model_profiles.yaml`.
-- Monocular depth for normal camera/video sources uses `transformers` and may download the model on first run.
-- The core QXG relation engine has a pure-Python implementation with tests.
-- Optional heavy dependencies are loaded lazily so tests and packaging work on clean machines.
+## Configuration Reference
+
+Important sections:
+
+- `runtime.reasoning_mode`: `2d` or `3d`.
+- `depth_estimation.model_name`: monocular depth model used for non-depth cameras/videos in 3D mode.
+- `realsense`: width, height, and FPS for RealSense input.
+- `detection.model_weights`: YOLO model path.
+- `detection.classes`: allowed object categories.
+- `detection.confidence_threshold`: minimum detector confidence.
+- `analysis.algebras`: qualitative relation families to compute.
+- `relevance`: relevance filtering mode and thresholds.
+- `visualization`: dashboard options.
+- `recording`: realtime recording options.
+
+## Validation
+
+Run tests and linting before publishing changes:
+
+```powershell
+pytest
+ruff check src tests
+```
+
+The core tests cover configuration loading, depth normalization, graph construction, serialization, tracker configuration, and recording output.
