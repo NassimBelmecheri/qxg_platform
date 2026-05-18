@@ -95,6 +95,44 @@ class RecordingInput(InputHandler):
             yield frame, world_info
 
 
+class VideoFileInput(InputHandler):
+    def __init__(self, path: str | Path):
+        self.path = Path(path).expanduser().resolve()
+        if not self.path.exists():
+            raise FileNotFoundError(f"Video file does not exist: {self.path}")
+        self.capture = cv2.VideoCapture(str(self.path))
+        if not self.capture.isOpened():
+            raise ValueError(f"Could not open video file: {self.path}")
+
+    def frames(self) -> Iterator[tuple[np.ndarray, object | None]]:
+        while True:
+            ok, frame = self.capture.read()
+            if not ok:
+                break
+            yield frame, None
+
+    def close(self) -> None:
+        self.capture.release()
+
+
+class WebcamInput(InputHandler):
+    def __init__(self, camera_index: int = 0):
+        self.camera_index = camera_index
+        self.capture = cv2.VideoCapture(camera_index)
+        if not self.capture.isOpened():
+            raise ValueError(f"Could not open camera index: {camera_index}")
+
+    def frames(self) -> Iterator[tuple[np.ndarray, object | None]]:
+        while True:
+            ok, frame = self.capture.read()
+            if not ok:
+                break
+            yield frame, None
+
+    def close(self) -> None:
+        self.capture.release()
+
+
 class RealtimeInput(InputHandler):
     def __init__(self, config: dict, reasoning_mode: str = "3d"):
         try:

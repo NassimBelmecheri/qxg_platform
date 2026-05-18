@@ -44,10 +44,30 @@ python -m pip install -e ".[realsense]"
 
 ## Run
 
+Graphical launcher:
+
+```powershell
+qxg-gui
+```
+
+The launcher lets you choose `video`, `camera`, `realsense`, or `recording`, pick or override the model profile, and then start the visualization dashboard.
+
 Recorded/video-directory mode:
 
 ```powershell
 qxg --config configs/video.yaml --input recording --source D:\path\to\recording
+```
+
+Single video file:
+
+```powershell
+qxg --config configs/video.yaml --input video --source D:\path\to\video.mp4
+```
+
+Normal webcam:
+
+```powershell
+qxg --config configs/video.yaml --input camera --source 0
 ```
 
 Server mode:
@@ -66,5 +86,6 @@ qxg --mode remote --config configs/realtime.yaml --server-url http://127.0.0.1:5
 
 - Network payloads use JSON plus base64 arrays, not pickle.
 - Model files are configured by path and validated at startup.
+- GUI model profiles live in `configs/model_profiles.yaml`.
 - The core QXG relation engine has a pure-Python implementation with tests.
 - Optional heavy dependencies are loaded lazily so tests and packaging work on clean machines.

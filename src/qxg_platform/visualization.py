@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import math
+from collections import Counter
+
 import cv2
 import numpy as np
 
@@ -10,8 +13,23 @@ class Visualizer:
     def __init__(self, config: dict):
         self.enabled = bool(config.get("enabled", True))
         self.window_name = str(config.get("window_name", "QXG Platform"))
+        self.width = int(config.get("dashboard_width", 1440))
+        self.height = int(config.get("dashboard_height", 900))
+        self.font = cv2.FONT_HERSHEY_SIMPLEX
+        self.colors = {
+            "bg": (24, 26, 30),
+            "panel": (35, 38, 45),
+            "muted": (150, 156, 166),
+            "text": (232, 235, 240),
+            "accent": (0, 215, 255),
+            "object": (255, 190, 60),
+            "camera": (90, 110, 255),
+            "edge": (130, 136, 148),
+            "danger": (80, 90, 255),
+        }
         if self.enabled:
-            cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
+            cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(self.window_name, self.width, self.height)
 
     def display(
         self,
@@ -22,34 +40,224 @@ class Visualizer:
     ) -> int:
         if not self.enabled:
             return -1
-        canvas = frame.copy()
+
+        dashboard = np.full((self.height, self.width, 3), self.colors["bg"], dtype=np.uint8)
+        left_w = int(self.width * 0.58)
+        top_h = int(self.height * 0.64)
+        right_w = self.width - left_w
+        bottom_h = self.height - top_h
+
+        camera_panel = dashboard[0:top_h, 0:left_w]
+        bev_panel = dashboard[top_h : self.height, 0 : left_w // 2]
+        graph_panel = dashboard[top_h : self.height, left_w // 2 : left_w]
+        side_panel = dashboard[0 : self.height, left_w : self.width]
+
         relevant_ids = {obj.tracking_id for obj in relevant_objects}
+        self._draw_camera(camera_panel, frame, objects, relevant_ids)
+        self._draw_bev(bev_panel, objects, relevant_ids)
+        self._draw_graph(graph_panel, objects, relations, relevant_ids)
+        self._draw_side_panel(side_panel, objects, relevant_objects, relations)
+        self._draw_panel_borders(dashboard, left_w, top_h, right_w, bottom_h)
+
+        cv2.imshow(self.window_name, dashboard)
+        return cv2.waitKey(1) & 0xFF
+
+    def _draw_camera(
+        self,
+        panel: np.ndarray,
+        frame: np.ndarray,
+        objects: list[TrackedObject],
+        relevant_ids: set[int],
+    ) -> None:
+        self._fill_panel(panel, "Camera")
+        view = self._letterbox(frame, panel.shape[1], panel.shape[0] - 42)
+        y_offset = 42
+        panel[y_offset : y_offset + view.shape[0], 0 : view.shape[1]] = view
+        scale_x = view.shape[1] / frame.shape[1]
+        scale_y = view.shape[0] / frame.shape[0]
         for obj in objects:
             if obj.category == "camera":
                 continue
             x, y, w, h = [int(v) for v in obj.bbox]
-            color = (0, 215, 255) if obj.tracking_id in relevant_ids else (255, 191, 0)
-            cv2.rectangle(canvas, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(
-                canvas,
-                f"{obj.category} {obj.tracking_id}",
-                (x, max(20, y - 8)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                color,
-                2,
+            color = (
+                self.colors["accent"]
+                if obj.tracking_id in relevant_ids
+                else self.colors["object"]
             )
-        cv2.putText(
-            canvas,
-            f"Objects: {len(objects)}  Relations: {len(relations)}",
-            (16, 28),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.75,
-            (230, 230, 230),
-            2,
-        )
-        cv2.imshow(self.window_name, canvas)
-        return cv2.waitKey(1) & 0xFF
+            p1 = (int(x * scale_x), int(y * scale_y) + y_offset)
+            p2 = (int((x + w) * scale_x), int((y + h) * scale_y) + y_offset)
+            cv2.rectangle(panel, p1, p2, color, 2)
+            self._label(
+                panel,
+                f"{obj.category} {obj.tracking_id}",
+                p1[0],
+                max(62, p1[1] - 8),
+                color,
+            )
+
+    def _draw_bev(
+        self,
+        panel: np.ndarray,
+        objects: list[TrackedObject],
+        relevant_ids: set[int],
+    ) -> None:
+        self._fill_panel(panel, "Bird's-Eye View")
+        h, w = panel.shape[:2]
+        origin = np.array([w // 2, h - 36])
+        scale = min(w / 16.0, h / 12.0)
+        cv2.line(panel, tuple(origin), (origin[0], 52), self.colors["muted"], 1)
+        cv2.line(panel, (20, origin[1]), (w - 20, origin[1]), self.colors["muted"], 1)
+        cv2.circle(panel, tuple(origin), 8, self.colors["camera"], -1)
+        self._label(panel, "ego", origin[0] + 10, origin[1] - 8, self.colors["text"], 0.45)
+
+        for obj in objects:
+            if obj.bev_center is None and obj.bev_bbox is None:
+                continue
+            color = (
+                self.colors["accent"]
+                if obj.tracking_id in relevant_ids
+                else self.colors["object"]
+            )
+            if obj.bev_bbox is not None:
+                x1, z1, x2, z2 = obj.bev_bbox
+                p1 = self._bev_to_pixel(origin, scale, x1, z1)
+                p2 = self._bev_to_pixel(origin, scale, x2, z2)
+                cv2.rectangle(
+                    panel,
+                    (min(p1[0], p2[0]), min(p1[1], p2[1])),
+                    (max(p1[0], p2[0]), max(p1[1], p2[1])),
+                    color,
+                    2,
+                )
+                self._label(panel, str(obj.tracking_id), p1[0], p1[1] - 6, color, 0.45)
+
+    def _draw_graph(
+        self,
+        panel: np.ndarray,
+        objects: list[TrackedObject],
+        relations: dict[tuple[int, int], dict],
+        relevant_ids: set[int],
+    ) -> None:
+        self._fill_panel(panel, "Qualitative Graph")
+        ids = sorted({obj.tracking_id for obj in objects})
+        if not ids:
+            self._label(panel, "No active graph yet", 20, 72, self.colors["muted"])
+            return
+        positions = self._node_positions(ids, panel.shape[1], panel.shape[0])
+        for left, right in relations:
+            if left in positions and right in positions:
+                color = (
+                    self.colors["accent"]
+                    if left in relevant_ids or right in relevant_ids
+                    else self.colors["edge"]
+                )
+                cv2.line(panel, positions[left], positions[right], color, 2)
+        category_by_id = {obj.tracking_id: obj.category for obj in objects}
+        for node_id, point in positions.items():
+            is_relevant = node_id in relevant_ids
+            is_camera = category_by_id.get(node_id) == "camera"
+            color_key = "camera" if is_camera else "accent" if is_relevant else "object"
+            color = self.colors[color_key]
+            cv2.circle(panel, point, 17, color, -1)
+            cv2.circle(panel, point, 17, self.colors["text"], 1)
+            text = str(node_id)
+            cv2.putText(panel, text, (point[0] - 8, point[1] + 6), self.font, 0.5, (20, 20, 20), 1)
+
+    def _draw_side_panel(
+        self,
+        panel: np.ndarray,
+        objects: list[TrackedObject],
+        relevant_objects: list[TrackedObject],
+        relations: dict[tuple[int, int], dict],
+    ) -> None:
+        self._fill_panel(panel, "Runtime")
+        y = 70
+        metrics = [
+            ("objects", len(objects)),
+            ("relevant", len(relevant_objects)),
+            ("relations", len(relations)),
+        ]
+        for label, value in metrics:
+            self._metric(panel, label, str(value), 24, y)
+            y += 58
+
+        y += 10
+        self._label(panel, "Classes", 24, y, self.colors["text"], 0.65)
+        y += 28
+        for category, count in Counter(obj.category for obj in objects).most_common(8):
+            self._label(panel, f"{category:<14} {count}", 28, y, self.colors["muted"], 0.52)
+            y += 24
+
+        y += 18
+        self._label(panel, "Latest Relations", 24, y, self.colors["text"], 0.65)
+        y += 28
+        if not relations:
+            self._label(panel, "Waiting for two tracked objects", 28, y, self.colors["muted"], 0.5)
+            return
+        for (left, right), relation in list(relations.items())[-9:]:
+            distance = relation.get("distance", "-")
+            qtc_x = relation.get("QTC_x", "-")
+            text = f"{left}-{right}: {distance}, {qtc_x}"
+            self._label(panel, text[:46], 28, y, self.colors["muted"], 0.48)
+            y += 23
+
+    def _fill_panel(self, panel: np.ndarray, title: str) -> None:
+        panel[:] = self.colors["panel"]
+        cv2.putText(panel, title, (18, 28), self.font, 0.72, self.colors["text"], 2)
+
+    def _draw_panel_borders(
+        self, dashboard: np.ndarray, left_w: int, top_h: int, right_w: int, bottom_h: int
+    ) -> None:
+        del right_w, bottom_h
+        cv2.line(dashboard, (left_w, 0), (left_w, self.height), self.colors["bg"], 3)
+        cv2.line(dashboard, (0, top_h), (left_w, top_h), self.colors["bg"], 3)
+        cv2.line(dashboard, (left_w // 2, top_h), (left_w // 2, self.height), self.colors["bg"], 3)
+
+    def _metric(self, panel: np.ndarray, label: str, value: str, x: int, y: int) -> None:
+        cv2.rectangle(panel, (x, y - 30), (panel.shape[1] - 24, y + 12), (45, 49, 58), -1)
+        self._label(panel, label.upper(), x + 12, y - 6, self.colors["muted"], 0.45)
+        self._label(panel, value, panel.shape[1] - 90, y - 2, self.colors["accent"], 0.72)
+
+    def _label(
+        self,
+        panel: np.ndarray,
+        text: str,
+        x: int,
+        y: int,
+        color: tuple[int, int, int],
+        scale: float = 0.55,
+    ) -> None:
+        cv2.putText(panel, text, (int(x), int(y)), self.font, scale, color, 1, cv2.LINE_AA)
+
+    def _letterbox(self, frame: np.ndarray, target_w: int, target_h: int) -> np.ndarray:
+        frame_h, frame_w = frame.shape[:2]
+        scale = min(target_w / frame_w, target_h / frame_h)
+        new_w, new_h = int(frame_w * scale), int(frame_h * scale)
+        resized = cv2.resize(frame, (new_w, new_h))
+        canvas = np.full((target_h, target_w, 3), self.colors["bg"], dtype=np.uint8)
+        y = (target_h - new_h) // 2
+        x = (target_w - new_w) // 2
+        canvas[y : y + new_h, x : x + new_w] = resized
+        return canvas
+
+    def _bev_to_pixel(
+        self, origin: np.ndarray, scale: float, x: float, z: float
+    ) -> tuple[int, int]:
+        return int(origin[0] + x * scale), int(origin[1] - z * scale)
+
+    def _node_positions(
+        self, ids: list[int], width: int, height: int
+    ) -> dict[int, tuple[int, int]]:
+        center = np.array([width // 2, height // 2 + 18])
+        radius = max(50, min(width, height) // 2 - 42)
+        if len(ids) == 1:
+            return {ids[0]: tuple(center)}
+        positions = {}
+        for index, node_id in enumerate(ids):
+            angle = -math.pi / 2 + 2 * math.pi * index / len(ids)
+            point = center + np.array([math.cos(angle), math.sin(angle)]) * radius
+            positions[node_id] = (int(point[0]), int(point[1]))
+        return positions
 
     def close(self) -> None:
         if self.enabled:

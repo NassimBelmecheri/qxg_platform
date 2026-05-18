@@ -36,6 +36,7 @@ dev = [
 
 [project.scripts]
 qxg = "qxg_platform.cli:main"
+qxg-gui = "qxg_platform.gui:main"
 qxg-server = "qxg_platform.server:main"
 
 [tool.setuptools.packages.find]
