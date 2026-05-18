@@ -1,0 +1,45 @@
+runtime:
+  reasoning_mode: "3d"
+  log_level: "INFO"
+
+camera:
+  include_camera_object: true
+  camera_id: 0
+  width_m: 0.5
+  depth_m: 0.5
+
+realsense:
+  width: 1280
+  height: 720
+  fps: 30
+
+detection:
+  enabled: true
+  model_weights: "D:/nassim/qxg_artifacts/models/yolo11x.pt"
+  classes: ["person", "car", "bus", "motorcycle", "truck", "bicycle"]
+  confidence_threshold: 0.6
+  image_size: 1280
+  persist_tracks: true
+  tracker_config: "configs/slow_tracker.yaml"
+
+analysis:
+  qtc_slack: 0.1
+  algebras:
+    RA: true
+    RCC4: false
+    QTC: true
+    distance: true
+    speed: false
+  distance_thresholds:
+    very_close: 0.5
+    close: 7.5
+    normal: 10.0
+    far: 20.0
+
+relevance:
+  enabled: false
+  mode: "rules"
+
+visualization:
+  enabled: true
+  window_name: "QXG Platform"

@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+dist/
+build/
+
+# Local/runtime artifacts
+.env
+outputs/
+logs/
+runs/
+
+# Large ML/data artifacts: keep outside Git or track with DVC/LFS.
+models/
+data/
+recordings/
+*.pt
+*.pth
+*.joblib
+*.pkl
+*.pickle
+*.mp4
+*.avi
+*.mov
+*.gif
+*.wav
+*.ply
+*.pdf
+*.pptx
