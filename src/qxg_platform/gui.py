@@ -18,6 +18,7 @@ from qxg_platform.platform import QXGPlatform
 DEFAULT_CONFIG = Path("configs/video.yaml")
 DEFAULT_PROFILES = Path("configs/model_profiles.yaml")
 DEFAULT_RECORDINGS_DIR = Path("recordings")
+DEFAULT_QXG_EXPORT_DIR = Path("qxg_exports")
 DEFAULT_DETECTION_CLASSES = [
     "person",
     "bicycle",
@@ -66,6 +67,8 @@ class LauncherApp:
         self.enable_relevance = BooleanVar(value=False)
         self.save_recording = BooleanVar(value=False)
         self.recording_dir = StringVar(value=str(DEFAULT_RECORDINGS_DIR))
+        self.save_qxg = BooleanVar(value=False)
+        self.qxg_export_dir = StringVar(value=str(DEFAULT_QXG_EXPORT_DIR))
         self.class_vars = {
             class_name: BooleanVar(value=False) for class_name in DEFAULT_DETECTION_CLASSES
         }
@@ -151,8 +154,23 @@ class LauncherApp:
             row=0, column=2, sticky="e", padx=8, pady=8
         )
 
+        qxg_export = ttk.LabelFrame(outer, text="QXG Export")
+        qxg_export.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        qxg_export.columnconfigure(1, weight=1)
+        ttk.Checkbutton(
+            qxg_export,
+            text="Save the built QXG graph",
+            variable=self.save_qxg,
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=8)
+        ttk.Entry(qxg_export, textvariable=self.qxg_export_dir).grid(
+            row=0, column=1, sticky="ew", padx=(8, 0), pady=8
+        )
+        ttk.Button(qxg_export, text="Browse", command=self._browse_qxg_export_dir).grid(
+            row=0, column=2, sticky="e", padx=8, pady=8
+        )
+
         objects = ttk.LabelFrame(outer, text="Objects To Detect")
-        objects.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        objects.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(12, 0))
         for index, (class_name, variable) in enumerate(self.class_vars.items()):
             ttk.Checkbutton(objects, text=class_name, variable=variable).grid(
                 row=index // 4,
@@ -163,12 +181,12 @@ class LauncherApp:
             )
 
         buttons = ttk.Frame(outer)
-        buttons.grid(row=9, column=1, sticky="ew", pady=(18, 8))
+        buttons.grid(row=10, column=1, sticky="ew", pady=(18, 8))
         ttk.Button(buttons, text="Start Platform", command=self._start).pack(side="left")
         ttk.Button(buttons, text="Quit", command=self.root.destroy).pack(side="left", padx=8)
 
         info = ttk.LabelFrame(outer, text="Visualization")
-        info.grid(row=10, column=0, columnspan=3, sticky="nsew", pady=(18, 0))
+        info.grid(row=11, column=0, columnspan=3, sticky="nsew", pady=(18, 0))
         info.columnconfigure(0, weight=1)
         ttk.Label(
             info,
@@ -182,7 +200,7 @@ class LauncherApp:
         ).grid(row=0, column=0, sticky="w", padx=10, pady=10)
 
         ttk.Label(outer, textvariable=self.status).grid(
-            row=11, column=0, columnspan=3, sticky="ew", pady=(16, 0)
+            row=12, column=0, columnspan=3, sticky="ew", pady=(16, 0)
         )
 
     def _browse_source(self) -> None:
@@ -220,6 +238,11 @@ class LauncherApp:
         value = filedialog.askdirectory(title="Choose recording output directory")
         if value:
             self.recording_dir.set(value)
+
+    def _browse_qxg_export_dir(self) -> None:
+        value = filedialog.askdirectory(title="Choose QXG export directory")
+        if value:
+            self.qxg_export_dir.set(value)
 
     def _on_input_change(self) -> None:
         input_type = self.input_type.get()
@@ -316,6 +339,10 @@ class LauncherApp:
             "enabled": bool(self.save_recording.get()),
             "output_dir": self.recording_dir.get() or str(DEFAULT_RECORDINGS_DIR),
         }
+        raw["qxg_export"] = {
+            "enabled": bool(self.save_qxg.get()),
+            "output_dir": self.qxg_export_dir.get() or str(DEFAULT_QXG_EXPORT_DIR),
+        }
         return PlatformConfig(raw=raw, source_path=loaded.source_path)
 
     def _build_input_handler(self, config: PlatformConfig):
@@ -330,7 +357,7 @@ class LauncherApp:
         if input_type == "recording":
             if not source:
                 raise ValueError("Choose a recording directory.")
-            return RecordingInput(source, config.reasoning_mode)
+            return RecordingInput(source, config.reasoning_mode, config.section("depth_estimation"))
         if input_type == "camera":
             return WebcamInput(
                 int(source or "0"),

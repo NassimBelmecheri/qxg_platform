@@ -39,7 +39,9 @@ def main() -> None:
             args.source, config.reasoning_mode, config.section("depth_estimation")
         )
     else:
-        input_handler = RecordingInput(args.source, config.reasoning_mode)
+        input_handler = RecordingInput(
+            args.source, config.reasoning_mode, config.section("depth_estimation")
+        )
     try:
         QXGPlatform(config, input_handler).run()
     except Exception as exc:

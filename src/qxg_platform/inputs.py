@@ -122,9 +122,15 @@ class DepthEstimatedInputMixin:
         return self.depth_estimator.estimate(frame)
 
 
-class RecordingInput(InputHandler):
-    def __init__(self, path: str | Path, reasoning_mode: str = "3d"):
+class RecordingInput(DepthEstimatedInputMixin, InputHandler):
+    def __init__(
+        self,
+        path: str | Path,
+        reasoning_mode: str = "3d",
+        depth_config: dict[str, Any] | None = None,
+    ):
         self.path = Path(path).expanduser().resolve()
+        self._setup_depth("2d", depth_config)
         self.reasoning_mode = reasoning_mode
         self.color_dir = self.path / "color"
         self.depth_dir = self.path / "depth"
@@ -137,6 +143,8 @@ class RecordingInput(InputHandler):
         self.intrinsics = CameraIntrinsics(1280, 720, 900.0, 900.0, 640.0, 360.0)
         self.depth_scale = 1000.0
         self._load_recording_config()
+        if self.reasoning_mode == "3d" and not list(self.depth_dir.glob("*.png")):
+            self._setup_depth(self.reasoning_mode, depth_config)
 
     def _load_recording_config(self) -> None:
         if not self.config_path.exists():
@@ -171,6 +179,8 @@ class RecordingInput(InputHandler):
                             depth_raw.astype(np.float32) / self.depth_scale,
                             self.intrinsics,
                         )
+                elif self.depth_estimator is not None:
+                    world_info = self._world_info_for_frame(frame)
             yield frame, world_info
 
 

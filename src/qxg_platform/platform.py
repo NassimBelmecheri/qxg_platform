@@ -7,6 +7,7 @@ from qxg_platform.detection import DetectionTracker
 from qxg_platform.domain import create_camera_object
 from qxg_platform.inputs import InputHandler
 from qxg_platform.qxg_builder import QXGBuilder
+from qxg_platform.qxg_export import QXGExporter
 from qxg_platform.recording import FrameRecorder
 from qxg_platform.relevance import RelevanceSelector
 from qxg_platform.visualization import Visualizer
@@ -25,6 +26,7 @@ class QXGPlatform:
         self.relevance = RelevanceSelector(config.section("relevance"))
         self.visualizer = Visualizer(config.section("visualization"))
         self.recorder = FrameRecorder(config.section("recording"), config.reasoning_mode)
+        self.qxg_exporter = QXGExporter(config.section("qxg_export"), config.reasoning_mode)
         self.camera_id = self.camera.tracking_id if self.camera else 0
         self._depth_warning_logged = False
 
@@ -38,6 +40,7 @@ class QXGPlatform:
                 objects = self.detector.process_frame(frame, world_info)
                 relations, all_objects = self.builder.build(objects, frame_idx)
                 relevant = self.relevance.select(all_objects, relations, self.camera_id)
+                self.qxg_exporter.add_frame(frame_idx, all_objects, relevant, relations)
                 key = self.visualizer.display(frame, all_objects, relevant, relations)
                 if frame_idx % 30 == 0:
                     LOGGER.info(
@@ -54,6 +57,7 @@ class QXGPlatform:
             LOGGER.exception("Platform processing loop failed")
             raise
         finally:
+            self.qxg_exporter.save()
             self.input_handler.close()
             self.visualizer.close()
             LOGGER.info("Platform resources released")
