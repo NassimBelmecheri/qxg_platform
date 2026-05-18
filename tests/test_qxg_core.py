@@ -34,3 +34,19 @@ def test_build_graph_has_distance_and_qtc() -> None:
     assert relations[(0, 1)]["distance"] == "close"
     assert relations[(0, 1)]["QTC_x"] == "moving towards"
     assert relations[(0, 1)]["QTC_y"] == "moving towards"
+
+
+def test_build_graph_has_ra_for_bev_boxes() -> None:
+    relations = build_spatiotemporal_graph(
+        object_ids=np.array([0, 1], dtype=np.int64),
+        position_histories=[
+            np.array([[0.0, 0.0, 0.0]]),
+            np.array([[1.0, 0.0, 2.0]]),
+        ],
+        timestamp_histories=[np.array([1.0]), np.array([1.0])],
+        qtc_slack=0.01,
+        algebras={"RA": True},
+        distance_thresholds={},
+        bev_boxes=np.array([[-0.25, 0.0, 0.25, 0.5], [0.5, 2.0, 1.5, 3.0]]),
+    )
+    assert relations[(0, 1)]["RA"] == ("Bx", "By")

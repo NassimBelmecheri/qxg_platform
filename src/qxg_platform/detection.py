@@ -156,10 +156,21 @@ class DetectionTracker:
         center_y = y + h / 2
         cam_x = (center_x - intrinsics.ppx) * depth / intrinsics.fx
         cam_y = (center_y - intrinsics.ppy) * depth / intrinsics.fy
-        obj.set_world_coord(np.array([cam_x, cam_y, depth], dtype=float))
+        p_cam_center = np.array([cam_x, cam_y, depth], dtype=float)
+        obj.set_world_coord(p_cam_center)
         obj.real_width = float(w / intrinsics.fx * depth)
         obj.real_height = float(h / intrinsics.fy * depth)
         obj.real_depth = obj.real_width * 0.8
+        obj.set_attribute("p_cam_center", p_cam_center)
+        obj.set_attribute(
+            "camera_intrinsics",
+            {
+                "fx": float(intrinsics.fx),
+                "fy": float(intrinsics.fy),
+                "ppx": float(intrinsics.ppx),
+                "ppy": float(intrinsics.ppy),
+            },
+        )
         obj.bev_center = np.array([cam_x, depth], dtype=float)
         obj.bev_bbox = np.array(
             [cam_x - obj.real_width / 2, depth, cam_x + obj.real_width / 2, depth + obj.real_depth],

@@ -70,11 +70,11 @@ class Visualizer:
         relevant_ids: set[int],
     ) -> None:
         self._fill_panel(panel, "Camera")
-        view = self._letterbox(frame, panel.shape[1], panel.shape[0] - 42)
+        view, offset_x, offset_y, scale = self._letterbox_info(
+            frame, panel.shape[1], panel.shape[0] - 42
+        )
         y_offset = 42
         panel[y_offset : y_offset + view.shape[0], 0 : view.shape[1]] = view
-        scale_x = view.shape[1] / frame.shape[1]
-        scale_y = view.shape[0] / frame.shape[0]
         for obj in objects:
             if obj.category == "camera":
                 continue
@@ -84,9 +84,13 @@ class Visualizer:
                 if obj.tracking_id in relevant_ids
                 else self.colors["object"]
             )
-            p1 = (int(x * scale_x), int(y * scale_y) + y_offset)
-            p2 = (int((x + w) * scale_x), int((y + h) * scale_y) + y_offset)
-            cv2.rectangle(panel, p1, p2, color, 2)
+            p1 = (int(offset_x + x * scale), int(y_offset + offset_y + y * scale))
+            p2 = (
+                int(offset_x + (x + w) * scale),
+                int(y_offset + offset_y + (y + h) * scale),
+            )
+            if not self._draw_3d_box(panel, obj, y_offset, offset_x, offset_y, scale, color):
+                cv2.rectangle(panel, p1, p2, color, 2)
             self._label(
                 panel,
                 f"{obj.category} {obj.tracking_id}",
@@ -144,7 +148,7 @@ class Visualizer:
             self._label(panel, "No active graph yet", 20, 72, self.colors["muted"])
             return
         positions = self._node_positions(ids, panel.shape[1], panel.shape[0])
-        for left, right in relations:
+        for (left, right), relation in relations.items():
             if left in positions and right in positions:
                 color = (
                     self.colors["accent"]
@@ -152,6 +156,19 @@ class Visualizer:
                     else self.colors["edge"]
                 )
                 cv2.line(panel, positions[left], positions[right], color, 2)
+                midpoint = (
+                    (positions[left][0] + positions[right][0]) // 2,
+                    (positions[left][1] + positions[right][1]) // 2,
+                )
+                if "RA" in relation:
+                    self._label(
+                        panel,
+                        f"RA {relation['RA']}",
+                        midpoint[0] - 34,
+                        midpoint[1] - 6,
+                        color,
+                        0.4,
+                    )
         category_by_id = {obj.tracking_id: obj.category for obj in objects}
         for node_id, point in positions.items():
             is_relevant = node_id in relevant_ids
@@ -195,9 +212,10 @@ class Visualizer:
             self._label(panel, "Waiting for two tracked objects", 28, y, self.colors["muted"], 0.5)
             return
         for (left, right), relation in list(relations.items())[-9:]:
+            ra = relation.get("RA", "-")
             distance = relation.get("distance", "-")
             qtc_x = relation.get("QTC_x", "-")
-            text = f"{left}-{right}: {distance}, {qtc_x}"
+            text = f"{left}-{right}: RA={ra}, D={distance}, Q={qtc_x}"
             self._label(panel, text[:46], 28, y, self.colors["muted"], 0.48)
             y += 23
 
@@ -230,6 +248,12 @@ class Visualizer:
         cv2.putText(panel, text, (int(x), int(y)), self.font, scale, color, 1, cv2.LINE_AA)
 
     def _letterbox(self, frame: np.ndarray, target_w: int, target_h: int) -> np.ndarray:
+        canvas, _, _, _ = self._letterbox_info(frame, target_w, target_h)
+        return canvas
+
+    def _letterbox_info(
+        self, frame: np.ndarray, target_w: int, target_h: int
+    ) -> tuple[np.ndarray, int, int, float]:
         frame_h, frame_w = frame.shape[:2]
         scale = min(target_w / frame_w, target_h / frame_h)
         new_w, new_h = int(frame_w * scale), int(frame_h * scale)
@@ -238,7 +262,73 @@ class Visualizer:
         y = (target_h - new_h) // 2
         x = (target_w - new_w) // 2
         canvas[y : y + new_h, x : x + new_w] = resized
-        return canvas
+        return canvas, x, y, scale
+
+    def _draw_3d_box(
+        self,
+        panel: np.ndarray,
+        obj: TrackedObject,
+        y_offset: int,
+        offset_x: int,
+        offset_y: int,
+        scale: float,
+        color: tuple[int, int, int],
+    ) -> bool:
+        corners = self._project_3d_box(obj)
+        if corners is None:
+            return False
+        points = np.empty_like(corners, dtype=np.int32)
+        points[:, 0] = (offset_x + corners[:, 0] * scale).astype(np.int32)
+        points[:, 1] = (y_offset + offset_y + corners[:, 1] * scale).astype(np.int32)
+        front = points[:4]
+        back = points[4:]
+        cv2.polylines(panel, [front], True, color, 2)
+        cv2.polylines(panel, [back], True, color, 1)
+        for index in range(4):
+            cv2.line(panel, tuple(front[index]), tuple(back[index]), color, 1)
+        return True
+
+    def _project_3d_box(self, obj: TrackedObject) -> np.ndarray | None:
+        center = obj.get_attribute("p_cam_center")
+        intrinsics = obj.get_attribute("camera_intrinsics")
+        if (
+            center is None
+            or intrinsics is None
+            or obj.real_width is None
+            or obj.real_height is None
+            or obj.real_depth is None
+        ):
+            return None
+        center = np.asarray(center, dtype=float)
+        if center[2] <= 0.1:
+            return None
+        half_w = obj.real_width / 2
+        half_h = obj.real_height / 2
+        depth = obj.real_depth
+        x, y, z = center
+        corners_3d = np.array(
+            [
+                [x - half_w, y - half_h, z],
+                [x + half_w, y - half_h, z],
+                [x + half_w, y + half_h, z],
+                [x - half_w, y + half_h, z],
+                [x - half_w, y - half_h, z + depth],
+                [x + half_w, y - half_h, z + depth],
+                [x + half_w, y + half_h, z + depth],
+                [x - half_w, y + half_h, z + depth],
+            ],
+            dtype=float,
+        )
+        fx = intrinsics["fx"]
+        fy = intrinsics["fy"]
+        ppx = intrinsics["ppx"]
+        ppy = intrinsics["ppy"]
+        projected = np.empty((8, 2), dtype=float)
+        projected[:, 0] = fx * corners_3d[:, 0] / corners_3d[:, 2] + ppx
+        projected[:, 1] = fy * corners_3d[:, 1] / corners_3d[:, 2] + ppy
+        if not np.isfinite(projected).all():
+            return None
+        return projected
 
     def _bev_to_pixel(
         self, origin: np.ndarray, scale: float, x: float, z: float
