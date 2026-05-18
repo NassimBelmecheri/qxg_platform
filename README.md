@@ -319,20 +319,14 @@ Important sections:
 
 ## References
 
-This project builds on qualitative spatial and temporal reasoning methods and applies them to automated-driving scene interpretation in the AI4CCAM context.
+For the complete and up-to-date publication list, see Nassim Belmecheri's [Google Scholar profile](https://scholar.google.com/citations?user=VccEbq4AAAAJ&hl=fr).
 
-### QXG And Automated Driving
+Project-related publications on qualitative reasoning, qualitative scene understanding, and automated driving:
 
-- Nassim Belmecheri, Arnaud Gotlieb, Nadjib Lazaar, and Helge Spieker. [Acquiring Qualitative Explainable Graphs for Automated Driving Scene Interpretation](https://arxiv.org/abs/2308.12755). arXiv:2308.12755, 2023. Introduces Qualitative eXplainable Graphs for automated-driving scenes and motivates qualitative spatiotemporal reasoning as an interpretable scene representation.
-
-### Qualitative Spatial And Temporal Reasoning
-
-- A. G. Cohn and S. M. Hazarika. [Qualitative Spatial Representation and Reasoning: An Overview](https://doi.org/10.3233/FUN-2001-461-202). Fundamenta Informaticae, 46(1-2):1-29, 2001. Survey of qualitative spatial representation, including topology, distance, orientation, shape, and spatial change.
-- Frank Dylla, Jae Hee Lee, Till Mossakowski, Thomas Schneider, Andre Van Delden, Jasper Van De Ven, and Diedrich Wolter. [A Survey of Qualitative Spatial and Temporal Calculi: Algebraic and Computational Properties](https://arxiv.org/abs/1606.00133). arXiv:1606.00133, 2016. Broad survey of qualitative calculi and their computational properties.
-- James F. Allen. [Maintaining Knowledge about Temporal Intervals](https://dblp.org/rec/journals/cacm/Allen83). Communications of the ACM, 26(11):832-843, 1983. Defines Allen interval relations, a foundation for qualitative temporal reasoning.
-- David A. Randell, Zhan Cui, and Anthony G. Cohn. [A Spatial Logic Based on Regions and Connection](https://philpapers.org/rec/RANASL). KR, pages 165-176, 1992. Introduces the Region Connection Calculus family used for qualitative topological relations.
-- Nico Van de Weghe, Anthony G. Cohn, Guy De Tre, and Philippe De Maeyer. [A Qualitative Trajectory Calculus as a Basis for Representing Moving Objects in Geographical Information Systems](https://eudml.org/doc/209410). Control and Cybernetics, 35(1):97-119, 2006. Defines QTC-style qualitative relations for moving objects.
-- Till Mossakowski and Reinhard Moratz. [Qualitative Reasoning about Relative Direction of Oriented Points](https://doi.org/10.1016/j.artint.2011.10.003). Artificial Intelligence, 180-181:34-45, 2012. Presents OPRA-style qualitative direction reasoning for oriented points.
+- Nassim Belmecheri, Arnaud Gotlieb, Nadjib Lazaar, and Helge Spieker. [Acquiring Qualitative Explainable Graphs for Automated Driving Scene Interpretation](https://arxiv.org/abs/2308.12755). arXiv:2308.12755, 2023.
+- Nassim Belmecheri, Arnaud Gotlieb, Nadjib Lazaar, and Helge Spieker. [Towards Trustworthy Automated Driving through Qualitative Scene Understanding and Explanations](https://arxiv.org/abs/2403.16908). SAE International Journal of Connected and Automated Vehicles, 2024.
+- Nassim Belmecheri, Arnaud Gotlieb, Nadjib Lazaar, and Helge Spieker. [Explainable Scene Understanding with Qualitative Representations and Graph Neural Networks](https://arxiv.org/abs/2504.12817). arXiv:2504.12817, 2025.
+- Nassim Belmecheri. [QualiNet: Acquiring Bird's Eye View Qualitative Spatial Representation from 2D Images in Automated Vehicle Perception](https://doi.org/10.4230/LIPIcs.TIME.2025.14). 32nd International Symposium on Temporal Representation and Reasoning, LIPIcs 355, 2025.
 
 ## Validation
 
