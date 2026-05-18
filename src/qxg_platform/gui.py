@@ -212,17 +212,16 @@ class LauncherApp:
         raw = copy.deepcopy(loaded.raw)
         profile = self.profiles[self.profile_key.get()]
         reasoning_mode = self.reasoning_mode.get()
-        if reasoning_mode == "3d" and self.input_type.get() not in {"realsense", "recording"}:
-            LOGGER.warning(
-                "3D requested for input_type=%s; falling back to 2D because no depth source exists",
+        if reasoning_mode == "3d" and self.input_type.get() in {"camera", "video"}:
+            LOGGER.info(
+                "3D requested for input_type=%s; using monocular depth estimation",
                 self.input_type.get(),
             )
-            reasoning_mode = "2d"
-            self.reasoning_mode.set("2d")
-            messagebox.showwarning(
-                "3D needs depth",
-                "3D reasoning needs RealSense or a recorded folder with depth frames. "
-                "For video files and normal cameras, QXG will run in 2D.",
+            messagebox.showinfo(
+                "Estimated depth",
+                "QXG will use monocular depth estimation for this source. "
+                "It is useful for visualization and relative 3D reasoning, but RealSense "
+                "depth is more accurate for metric distances.",
             )
         raw.setdefault("runtime", {})["reasoning_mode"] = reasoning_mode
         raw.setdefault("detection", {})["model_weights"] = self.model_path.get()
@@ -245,13 +244,19 @@ class LauncherApp:
         if input_type == "video":
             if not source:
                 raise ValueError("Choose a video file.")
-            return VideoFileInput(source)
+            return VideoFileInput(
+                source, config.reasoning_mode, config.section("depth_estimation")
+            )
         if input_type == "recording":
             if not source:
                 raise ValueError("Choose a recording directory.")
             return RecordingInput(source, config.reasoning_mode)
         if input_type == "camera":
-            return WebcamInput(int(source or "0"))
+            return WebcamInput(
+                int(source or "0"),
+                config.reasoning_mode,
+                config.section("depth_estimation"),
+            )
         return RealtimeInput(config.section("realsense"), config.reasoning_mode)
 
     def _run_platform(self, config: PlatformConfig, input_handler) -> None:

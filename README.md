@@ -70,6 +70,8 @@ Normal webcam:
 qxg --config configs/video.yaml --input camera --source 0
 ```
 
+When `3d` reasoning is selected with a normal camera or a single video file, QXG uses monocular depth estimation through the configured `depth_estimation.model_name`. RealSense and RealSense recordings still use sensor depth.
+
 Server mode:
 
 ```powershell
@@ -87,5 +89,6 @@ qxg --mode remote --config configs/realtime.yaml --server-url http://127.0.0.1:5
 - Network payloads use JSON plus base64 arrays, not pickle.
 - Model files are configured by path and validated at startup.
 - GUI model profiles live in `configs/model_profiles.yaml`.
+- Monocular depth for normal camera/video sources uses `transformers` and may download the model on first run.
 - The core QXG relation engine has a pure-Python implementation with tests.
 - Optional heavy dependencies are loaded lazily so tests and packaging work on clean machines.

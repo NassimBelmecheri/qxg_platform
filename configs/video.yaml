@@ -2,6 +2,9 @@ runtime:
   reasoning_mode: "3d"
   log_level: "INFO"
 
+depth_estimation:
+  model_name: "Intel/dpt-hybrid-midas"
+
 camera:
   include_camera_object: true
   camera_id: 0

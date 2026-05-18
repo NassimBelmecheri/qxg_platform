@@ -31,9 +31,13 @@ def main() -> None:
     if args.input == "realsense":
         input_handler = RealtimeInput(config.section("realsense"), config.reasoning_mode)
     elif args.input == "camera":
-        input_handler = WebcamInput(int(args.source))
+        input_handler = WebcamInput(
+            int(args.source), config.reasoning_mode, config.section("depth_estimation")
+        )
     elif args.input == "video":
-        input_handler = VideoFileInput(args.source)
+        input_handler = VideoFileInput(
+            args.source, config.reasoning_mode, config.section("depth_estimation")
+        )
     else:
         input_handler = RecordingInput(args.source, config.reasoning_mode)
     try:

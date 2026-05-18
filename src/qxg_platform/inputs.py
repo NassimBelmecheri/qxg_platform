@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -41,6 +42,84 @@ class InputHandler(ABC):
 
     def close(self) -> None:
         return None
+
+
+class MonocularDepthEstimator:
+    def __init__(self, model_name: str = "Intel/dpt-hybrid-midas"):
+        try:
+            import torch
+            from transformers import DPTForDepthEstimation, DPTImageProcessor
+        except ImportError as exc:
+            raise RuntimeError(
+                "Install qxg-platform[ml] to use monocular depth estimation."
+            ) from exc
+
+        self.torch = torch
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.processor = DPTImageProcessor.from_pretrained(model_name)
+        self.model = DPTForDepthEstimation.from_pretrained(model_name).to(self.device)
+        self.model.eval()
+
+    def estimate(self, frame_bgr: np.ndarray) -> DepthFrame:
+        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        inputs = self.processor(images=rgb, return_tensors="pt").to(self.device)
+        with self.torch.no_grad():
+            predicted = self.model(**inputs).predicted_depth
+        prediction = self.torch.nn.functional.interpolate(
+            predicted.unsqueeze(1),
+            size=frame_bgr.shape[:2],
+            mode="bicubic",
+            align_corners=False,
+        ).squeeze()
+        depth = prediction.detach().cpu().numpy().astype(np.float32)
+        depth = normalize_estimated_depth(depth)
+        intrinsics = approximate_intrinsics(frame_bgr)
+        return DepthFrame(depth, intrinsics)
+
+
+def normalize_estimated_depth(
+    depth: np.ndarray, min_m: float = 0.5, max_m: float = 12.0
+) -> np.ndarray:
+    finite = depth[np.isfinite(depth)]
+    if finite.size == 0:
+        return np.full_like(depth, min_m, dtype=np.float32)
+    low, high = np.percentile(finite, [2, 98])
+    if high <= low:
+        return np.full_like(depth, (min_m + max_m) / 2, dtype=np.float32)
+    clipped = np.clip(depth, low, high)
+    normalized = (clipped - low) / (high - low)
+    # DPT predicts inverse-ish relative depth. Flip so larger values are farther away.
+    metric_like = max_m - normalized * (max_m - min_m)
+    return metric_like.astype(np.float32)
+
+
+def approximate_intrinsics(frame: np.ndarray) -> CameraIntrinsics:
+    height, width = frame.shape[:2]
+    focal = float(max(width, height) * 1.2)
+    return CameraIntrinsics(
+        width=width,
+        height=height,
+        fx=focal,
+        fy=focal,
+        ppx=width / 2,
+        ppy=height / 2,
+    )
+
+
+class DepthEstimatedInputMixin:
+    def _setup_depth(self, reasoning_mode: str, depth_config: dict[str, Any] | None = None) -> None:
+        self.reasoning_mode = reasoning_mode
+        self.depth_estimator = None
+        if reasoning_mode == "3d":
+            depth_config = depth_config or {}
+            self.depth_estimator = MonocularDepthEstimator(
+                str(depth_config.get("model_name", "Intel/dpt-hybrid-midas"))
+            )
+
+    def _world_info_for_frame(self, frame: np.ndarray) -> object | None:
+        if self.depth_estimator is None:
+            return None
+        return self.depth_estimator.estimate(frame)
 
 
 class RecordingInput(InputHandler):
@@ -95,8 +174,14 @@ class RecordingInput(InputHandler):
             yield frame, world_info
 
 
-class VideoFileInput(InputHandler):
-    def __init__(self, path: str | Path):
+class VideoFileInput(DepthEstimatedInputMixin, InputHandler):
+    def __init__(
+        self,
+        path: str | Path,
+        reasoning_mode: str = "2d",
+        depth_config: dict[str, Any] | None = None,
+    ):
+        self._setup_depth(reasoning_mode, depth_config)
         self.path = Path(path).expanduser().resolve()
         if not self.path.exists():
             raise FileNotFoundError(f"Video file does not exist: {self.path}")
@@ -109,14 +194,20 @@ class VideoFileInput(InputHandler):
             ok, frame = self.capture.read()
             if not ok:
                 break
-            yield frame, None
+            yield frame, self._world_info_for_frame(frame)
 
     def close(self) -> None:
         self.capture.release()
 
 
-class WebcamInput(InputHandler):
-    def __init__(self, camera_index: int = 0):
+class WebcamInput(DepthEstimatedInputMixin, InputHandler):
+    def __init__(
+        self,
+        camera_index: int = 0,
+        reasoning_mode: str = "2d",
+        depth_config: dict[str, Any] | None = None,
+    ):
+        self._setup_depth(reasoning_mode, depth_config)
         self.camera_index = camera_index
         self.capture = cv2.VideoCapture(camera_index)
         if not self.capture.isOpened():
@@ -127,7 +218,7 @@ class WebcamInput(InputHandler):
             ok, frame = self.capture.read()
             if not ok:
                 break
-            yield frame, None
+            yield frame, self._world_info_for_frame(frame)
 
     def close(self) -> None:
         self.capture.release()
