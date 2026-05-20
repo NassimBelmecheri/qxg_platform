@@ -16,6 +16,7 @@ build/
 outputs/
 logs/
 runs/
+qxg_exports/
 
 # Large ML/data artifacts: keep outside Git or track with DVC/LFS.
 models/
