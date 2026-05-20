@@ -155,6 +155,17 @@ model_weights: "D:/nassim/qxg_platform/models/yolo11x.pt"
 
 Model weights are intentionally not stored in this repository.
 
+When the GUI starts a run and the selected YOLO weights file is missing, QXG proposes to download the model before continuing. The download uses `detection.model_url`, `detection.model_urls`, or the built-in Ultralytics URLs for common models such as `yolo11x.pt` and `yolov8n.pt`.
+
+Example:
+
+```yaml
+detection:
+  model_weights: "models/yolo11x.pt"
+  model_urls:
+    yolo11x.pt: "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11x.pt"
+```
+
 ## Graphical Launcher
 
 Start the launcher:
@@ -347,6 +358,7 @@ Important sections:
 - `depth_estimation.model_name`: monocular depth model used for non-depth cameras/videos in 3D mode.
 - `realsense`: width, height, and FPS for RealSense input.
 - `detection.model_weights`: YOLO model path.
+- `detection.model_url` or `detection.model_urls`: optional YOLO download URL configuration.
 - `detection.classes`: allowed object categories.
 - `detection.confidence_threshold`: minimum detector confidence.
 - `analysis.algebras`: qualitative relation families to compute.

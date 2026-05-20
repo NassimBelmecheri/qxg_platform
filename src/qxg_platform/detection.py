@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 import time
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from qxg_platform.domain import TrackedObject
+from qxg_platform.yolo_models import ensure_yolo_model
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,9 +31,7 @@ class DetectionTracker:
         except ImportError as exc:
             raise RuntimeError("Install qxg-platform[ml] to enable YOLO detection") from exc
 
-        weights = Path(str(self.config["model_weights"])).expanduser()
-        if not weights.exists():
-            raise FileNotFoundError(f"YOLO weights not found: {weights}")
+        weights = ensure_yolo_model(self.config)
         LOGGER.info("Loading YOLO model weights=%s", weights)
         self.model = YOLO(str(weights))
         self.classes = self.model.names

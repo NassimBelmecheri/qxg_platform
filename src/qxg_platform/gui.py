@@ -14,6 +14,7 @@ from qxg_platform.config import PlatformConfig, load_config
 from qxg_platform.inputs import RealtimeInput, RecordingInput, VideoFileInput, WebcamInput
 from qxg_platform.logging_utils import configure_logging
 from qxg_platform.platform import QXGPlatform
+from qxg_platform.yolo_models import ModelDownloadProposal, ensure_yolo_model
 
 DEFAULT_CONFIG = Path("configs/video.yaml")
 DEFAULT_PROFILES = Path("configs/model_profiles.yaml")
@@ -406,6 +407,7 @@ class LauncherApp:
         if not selected_classes:
             raise ValueError("Select at least one object to detect.")
         raw["detection"]["classes"] = selected_classes
+        ensure_yolo_model(raw["detection"], self._confirm_yolo_download)
         raw.setdefault("relevance", {})["enabled"] = bool(self.enable_relevance.get())
         raw.setdefault("visualization", {})["enabled"] = True
         raw["recording"] = {
@@ -440,6 +442,18 @@ class LauncherApp:
             "image_size": 224,
         }
         return PlatformConfig(raw=raw, source_path=loaded.source_path)
+
+    def _confirm_yolo_download(self, proposal: ModelDownloadProposal) -> bool:
+        if not proposal.can_download:
+            return False
+        return messagebox.askyesno(
+            "Download YOLO model",
+            "The selected YOLO model weights do not exist:\n\n"
+            f"{proposal.path}\n\n"
+            "QXG can download them now from:\n\n"
+            f"{proposal.url}\n\n"
+            "Download this model?",
+        )
 
     def _build_input_handler(self, config: PlatformConfig):
         input_type = self.input_type.get()
