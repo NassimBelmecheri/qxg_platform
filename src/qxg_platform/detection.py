@@ -69,15 +69,37 @@ class DetectionTracker:
         box_data = boxes.cpu().numpy()
         raw_count = len(box_data)
         kept_count = 0
+        seen_tracking_ids: set[int] = set()
+        kept_detections: list[tuple[str, np.ndarray]] = []
+        duplicate_iou_threshold = float(self.config.get("duplicate_iou_threshold", 0.85))
         for index in range(raw_count):
             tracking_id = self._tracking_id_for_box(box_data, index)
+            if tracking_id in seen_tracking_ids:
+                LOGGER.debug(
+                    "Skipping duplicate detection with repeated tracking_id=%s at frame=%s",
+                    tracking_id,
+                    self.frame_count,
+                )
+                continue
             category = self.classes[int(box_data.cls[index])]
             if allowed_classes and category not in allowed_classes:
                 continue
-            kept_count += 1
 
             x1, y1, x2, y2 = map(int, box_data.xyxy[index])
             bbox = np.array([x1, y1, x2 - x1, y2 - y1], dtype=float)
+            if is_duplicate_detection(
+                category, bbox, kept_detections, duplicate_iou_threshold
+            ):
+                LOGGER.debug(
+                    "Skipping duplicate %s detection at frame=%s bbox=%s",
+                    category,
+                    self.frame_count,
+                    bbox.tolist(),
+                )
+                continue
+            kept_count += 1
+            seen_tracking_ids.add(tracking_id)
+            kept_detections.append((category, bbox))
             obj = self.objects.get(tracking_id)
             if obj is None:
                 obj = TrackedObject(
@@ -174,6 +196,41 @@ class DetectionTracker:
             [cam_x - obj.real_width / 2, depth, cam_x + obj.real_width / 2, depth + obj.real_depth],
             dtype=float,
         )
+
+
+def is_duplicate_detection(
+    category: str,
+    bbox: np.ndarray,
+    kept_detections: list[tuple[str, np.ndarray]],
+    iou_threshold: float,
+) -> bool:
+    if iou_threshold <= 0:
+        return False
+    return any(
+        category == kept_category and bbox_iou(bbox, kept_bbox) >= iou_threshold
+        for kept_category, kept_bbox in kept_detections
+    )
+
+
+def bbox_iou(left: np.ndarray, right: np.ndarray) -> float:
+    left_x1, left_y1, left_w, left_h = map(float, left)
+    right_x1, right_y1, right_w, right_h = map(float, right)
+    left_x2 = left_x1 + max(0.0, left_w)
+    left_y2 = left_y1 + max(0.0, left_h)
+    right_x2 = right_x1 + max(0.0, right_w)
+    right_y2 = right_y1 + max(0.0, right_h)
+
+    inter_x1 = max(left_x1, right_x1)
+    inter_y1 = max(left_y1, right_y1)
+    inter_x2 = min(left_x2, right_x2)
+    inter_y2 = min(left_y2, right_y2)
+    inter_area = max(0.0, inter_x2 - inter_x1) * max(0.0, inter_y2 - inter_y1)
+    left_area = max(0.0, left_w) * max(0.0, left_h)
+    right_area = max(0.0, right_w) * max(0.0, right_h)
+    union = left_area + right_area - inter_area
+    if union <= 0:
+        return 0.0
+    return inter_area / union
 
 
 def robust_depth(world_info: Any, bbox: np.ndarray) -> float:
